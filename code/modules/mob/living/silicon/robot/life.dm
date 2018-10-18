@@ -2,7 +2,7 @@
 	set invisibility = 0
 	set background = 1
 
-	if (src.transforming)
+	if (HAS_TRANSFORMATION_MOVEMENT_HANDLER(src))
 		return
 
 	src.blinded = null
@@ -20,11 +20,7 @@
 		process_killswitch()
 		process_locks()
 		process_queued_alarms()
-	else
-		if (!src.death_notified && src.connected_ai)
-			src.notify_ai(ROBOT_NOTIFICATION_SIGNAL_LOST)
-			src.death_notified = TRUE
-	update_canmove()
+	UpdateLyingBuckledAndVerbStatus()
 
 /mob/living/silicon/robot/proc/clamp_values()
 
@@ -39,7 +35,8 @@
 
 /mob/living/silicon/robot/proc/use_power()
 	// Debug only
-	// world << "DEBUG: life.dm line 35: cyborg use_power() called at tick [controller_iteration]"
+//	log_debug(life.dm line 35: cyborg use_power() called at tick [controller_iteration]")
+
 	used_power_this_tick = 0
 	for(var/V in components)
 		var/datum/robot_component/C = components[V]
@@ -62,13 +59,11 @@
 		src.has_power = 1
 	else
 		if (src.has_power)
-			src << "\red You are now running on emergency backup power."
+			to_chat(src, "<span class='warning'>You are now running on emergency backup power.</span>")
 		src.has_power = 0
 		if(lights_on) // Light is on but there is no power!
 			lights_on = 0
 			set_light(0)
-
-
 
 /mob/living/silicon/robot/handle_regular_status_updates()
 
@@ -87,12 +82,12 @@
 	if(src.resting)
 		Weaken(5)
 
-	if(health < HEALTH_THRESHOLD_DEAD && src.stat != 2) //die only once
+	if(health < config.health_threshold_dead && src.stat != 2) //die only once
 		death()
 
-	if (src.stat != 2) //Alive.
+	if (src.stat != DEAD) //Alive.
 		if (src.paralysis || src.stunned || src.weakened || !src.has_power) //Stunned etc.
-			src.stat = 1
+			src.set_stat(UNCONSCIOUS)
 			if (src.stunned > 0)
 				AdjustStunned(-1)
 			if (src.weakened > 0)
@@ -104,13 +99,13 @@
 				src.blinded = 0
 
 		else	//Not stunned.
-			src.stat = 0
+			src.set_stat(CONSCIOUS)
 
-		confused = max(0, confused - 1)
+		handle_confused()
 
 	else //Dead.
 		src.blinded = 1
-		src.stat = 2
+		src.set_stat(DEAD)
 
 	if (src.stuttering) src.stuttering--
 
@@ -123,7 +118,7 @@
 		src.ear_damage -= 0.05
 		src.ear_damage = max(src.ear_damage, 0)
 
-	src.density = !( src.lying )
+	src.set_density(!src.lying)
 
 	if ((src.sdisabilities & BLIND))
 		src.blinded = 1
@@ -138,11 +133,15 @@
 		src.druggy--
 		src.druggy = max(0, src.druggy)
 
-	if(radio)
+	//update the state of modules and components here
+	if (src.stat != 0)
+		uneq_all()
+
+	if(silicon_radio)
 		if(!is_component_functioning("radio"))
-			radio.on = 0
+			silicon_radio.on = 0
 		else
-			radio.on = 1
+			silicon_radio.on = 1
 
 	if(is_component_functioning("camera"))
 		src.blinded = 0
@@ -152,29 +151,8 @@
 	return 1
 
 /mob/living/silicon/robot/handle_regular_hud_updates()
-
-	.=..()
-	if (!.)//Parent function will return zero if no client
-		return
-
-
-
-
-
-
-
-	for (var/obj/screen/H in HUDprocess)
-//		var/obj/screen/B = H
-		H.Process()
-
-
-
-	return 1
-
-
-/mob/living/silicon/robot/handle_vision()
 	..()
-	client.screen.Remove(global_hud.blurry,global_hud.druggy,global_hud.vimpaired)
+
 	var/obj/item/borg/sight/hud/hud = (locate(/obj/item/borg/sight/hud) in src)
 	if(hud && hud.hud)
 		hud.hud.process_hud(src)
@@ -185,73 +163,147 @@
 			if (MED_HUD)
 				process_med_hud(src,0)
 
+	if (src.healths)
+		if (src.stat != 2)
+			if(istype(src,/mob/living/silicon/robot/drone))
+				switch(health)
+					if(35 to INFINITY)
+						src.healths.icon_state = "health0"
+					if(25 to 34)
+						src.healths.icon_state = "health1"
+					if(15 to 24)
+						src.healths.icon_state = "health2"
+					if(5 to 14)
+						src.healths.icon_state = "health3"
+					if(0 to 4)
+						src.healths.icon_state = "health4"
+					if(-35 to 0)
+						src.healths.icon_state = "health5"
+					else
+						src.healths.icon_state = "health6"
+			else
+				switch(health)
+					if(200 to INFINITY)
+						src.healths.icon_state = "health0"
+					if(150 to 200)
+						src.healths.icon_state = "health1"
+					if(100 to 150)
+						src.healths.icon_state = "health2"
+					if(50 to 100)
+						src.healths.icon_state = "health3"
+					if(0 to 50)
+						src.healths.icon_state = "health4"
+					if(config.health_threshold_dead to 0)
+						src.healths.icon_state = "health5"
+					else
+						src.healths.icon_state = "health6"
+		else
+			src.healths.icon_state = "health7"
 
-/mob/living/silicon/robot/update_sight()
-	if(stat == DEAD || eyeobj)
-		update_dead_sight()
-	else
-		if (is_ventcrawling)
-			sight |= SEE_TURFS|SEE_OBJS|BLIND
+	if (src.syndicate && src.client)
+		for(var/datum/mind/tra in GLOB.traitors.current_antagonists)
+			if(tra.current)
+				// TODO: Update to new antagonist system.
+				var/I = image('icons/mob/mob.dmi', loc = tra.current, icon_state = "traitor")
+				src.client.images += I
+		src.disconnect_from_ai()
+		if(src.mind)
+			// TODO: Update to new antagonist system.
+			if(!src.mind.special_role)
+				src.mind.special_role = "traitor"
+				GLOB.traitors.current_antagonists |= src.mind
 
-		if ((src.sight_mode & BORGXRAY))
-			src.sight |= SEE_TURFS
-			src.sight |= SEE_MOBS
-			src.sight |= SEE_OBJS
-			src.see_in_dark = 8
-			src.see_invisible = SEE_INVISIBLE_MINIMUM
-		else if ((src.sight_mode & BORGMESON) && (src.sight_mode & BORGTHERM))
-			src.sight |= SEE_TURFS
-			src.sight |= SEE_MOBS
-			src.see_in_dark = 8
-			see_invisible = SEE_INVISIBLE_MINIMUM
-		else if (src.sight_mode & BORGMESON)
-			src.sight |= SEE_TURFS
-			src.see_in_dark = 8
-			see_invisible = SEE_INVISIBLE_MINIMUM
-		else if (src.sight_mode & BORGMATERIAL)
-			src.sight |= SEE_OBJS
-			src.see_in_dark = 8
-			see_invisible = SEE_INVISIBLE_MINIMUM
-		else if (src.sight_mode & BORGTHERM)
-			src.sight |= SEE_MOBS
-			src.see_in_dark = 8
-			src.see_invisible = SEE_INVISIBLE_LEVEL_TWO
-		else if (src.stat != 2)
-			src.sight &= ~SEE_MOBS
-			src.sight &= ~SEE_TURFS
-			src.sight &= ~SEE_OBJS
-			src.see_in_dark = 8 			 // see_in_dark means you can FAINTLY see in the dark, humans have a range of 3 or so
-			src.see_invisible = SEE_INVISIBLE_LIVING // This is normal vision (25), setting it lower for normal vision means you don't "see" things like darkness since darkness
-								 // has a "invisible" value of 15
+	if (src.cells)
+		if (src.cell)
+			var/chargeNum = Clamp(ceil(cell.percent()/25), 0, 4)	//0-100 maps to 0-4, but give it a paranoid clamp just in case.
+			src.cells.icon_state = "charge[chargeNum]"
+		else
+			src.cells.icon_state = "charge-empty"
 
-/mob/living/silicon/robot/update_dead_sight()
-	src.sight |= SEE_TURFS
-	src.sight |= SEE_MOBS
-	src.sight |= SEE_OBJS
-	src.see_in_dark = 8
-	src.see_invisible = SEE_INVISIBLE_MINIMUM
+	if(bodytemp)
+		switch(src.bodytemperature) //310.055 optimal body temp
+			if(335 to INFINITY)
+				src.bodytemp.icon_state = "temp2"
+			if(320 to 335)
+				src.bodytemp.icon_state = "temp1"
+			if(300 to 320)
+				src.bodytemp.icon_state = "temp0"
+			if(260 to 300)
+				src.bodytemp.icon_state = "temp-1"
+			else
+				src.bodytemp.icon_state = "temp-2"
+
+//Oxygen and fire does nothing yet!!
+//	if (src.oxygen) src.oxygen.icon_state = "oxy[src.oxygen_alert ? 1 : 0]"
+//	if (src.fire) src.fire.icon_state = "fire[src.fire_alert ? 1 : 0]"
+
+	if(stat != DEAD)
+		if(blinded)
+			overlay_fullscreen("blind", /obj/screen/fullscreen/blind)
+		else
+			clear_fullscreen("blind")
+			set_fullscreen(disabilities & NEARSIGHTED, "impaired", /obj/screen/fullscreen/impaired, 1)
+			set_fullscreen(eye_blurry, "blurry", /obj/screen/fullscreen/blurry)
+			set_fullscreen(druggy, "high", /obj/screen/fullscreen/high)
+
+		if (machine)
+			if (machine.check_eye(src) < 0)
+				reset_view(null)
+		else
+			if(client && !client.adminobs)
+				reset_view(null)
+
+	return 1
+
+/mob/living/silicon/robot/handle_vision()
+	..()
+
+	if (src.stat == DEAD || (XRAY in mutations) || (src.sight_mode & BORGXRAY))
+		set_sight(sight|SEE_TURFS|SEE_MOBS|SEE_OBJS)
+		set_see_in_dark(8)
+		set_see_invisible(SEE_INVISIBLE_LEVEL_TWO)
+	else if ((src.sight_mode & BORGMESON) && (src.sight_mode & BORGTHERM))
+		set_sight(sight|SEE_TURFS|SEE_MOBS)
+		set_see_in_dark(8)
+		set_see_invisible(SEE_INVISIBLE_NOLIGHTING)
+	else if (src.sight_mode & BORGMESON)
+		set_sight(sight|SEE_TURFS)
+		set_see_in_dark(8)
+		set_see_invisible(SEE_INVISIBLE_NOLIGHTING)
+	else if (src.sight_mode & BORGMATERIAL)
+		set_sight(sight|SEE_OBJS)
+		set_see_in_dark(8)
+	else if (src.sight_mode & BORGTHERM)
+		set_sight(sight|SEE_MOBS)
+		set_see_in_dark(8)
+		set_see_invisible(SEE_INVISIBLE_LEVEL_TWO)
+	else if (src.stat != DEAD)
+		set_sight(sight&(~SEE_TURFS)&(~SEE_MOBS)&(~SEE_OBJS))
+		set_see_in_dark(8) 			 // see_in_dark means you can FAINTLY see in the dark, humans have a range of 3 or so
+		set_see_invisible(SEE_INVISIBLE_LIVING) // This is normal vision (25), setting it lower for normal vision means you don't "see" things like darkness since darkness
+							 // has a "invisible" value of 15
 
 
 /mob/living/silicon/robot/proc/update_items()
 	if (src.client)
 		src.client.screen -= src.contents
 		for(var/obj/I in src.contents)
-			if(I && !(istype(I,/obj/item/weapon/cell/large) || istype(I,/obj/item/device/radio)  || istype(I,/obj/machinery/camera) || istype(I,/obj/item/device/mmi)))
+			if(I && !(istype(I,/obj/item/weapon/cell) || istype(I,/obj/item/device/radio)  || istype(I,/obj/machinery/camera) || istype(I,/obj/item/device/mmi)))
 				src.client.screen += I
 	if(src.module_state_1)
-		src.module_state_1:screen_loc = find_inv_position(1)
+		src.module_state_1:screen_loc = ui_inv1
 	if(src.module_state_2)
-		src.module_state_2:screen_loc = find_inv_position(2)
+		src.module_state_2:screen_loc = ui_inv2
 	if(src.module_state_3)
-		src.module_state_3:screen_loc = find_inv_position(3)
-	updateicon()
+		src.module_state_3:screen_loc = ui_inv3
+	update_icon()
 
 /mob/living/silicon/robot/proc/process_killswitch()
 	if(killswitch)
 		killswitch_time --
 		if(killswitch_time <= 0)
 			if(src.client)
-				src << SPAN_DANGER("Killswitch Activated")
+				to_chat(src, "<span class='danger'>Killswitch Activated</span>")
 			killswitch = 0
 			spawn(5)
 				gib()
@@ -262,20 +314,15 @@
 		weaponlock_time --
 		if(weaponlock_time <= 0)
 			if(src.client)
-				src << SPAN_DANGER("Weapon Lock Timed Out!")
+				to_chat(src, "<span class='danger'>Weapon Lock Timed Out!</span>")
 			weapon_lock = 0
 			weaponlock_time = 120
-
-/mob/living/silicon/robot/update_canmove()
-	if(paralysis || stunned || weakened || buckled || lockcharge || !is_component_functioning("actuator")) canmove = 0
-	else canmove = 1
-	return canmove
 
 /mob/living/silicon/robot/update_fire()
 	overlays -= image("icon"='icons/mob/OnFire.dmi', "icon_state"="Standing")
 	if(on_fire)
 		overlays += image("icon"='icons/mob/OnFire.dmi', "icon_state"="Standing")
 
-/mob/living/silicon/robot/fire_act()
+/mob/living/silicon/robot/fire_act(datum/gas_mixture/air, exposed_temperature, exposed_volume)
 	if(!on_fire) //Silicons don't gain stacks from hotspots, but hotspots can ignite them
 		IgniteMob()

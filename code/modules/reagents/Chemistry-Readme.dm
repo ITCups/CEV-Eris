@@ -5,7 +5,7 @@ Structure: ///////////////////          //////////////////////////
 		   // Mob or object // -------> // Reagents var (datum) // 	    Is a reference to the datum that holds the reagents.
 		   ///////////////////          //////////////////////////
 		   			|				    			 |
-    The object that holds everything.   			 V
+	The object that holds everything.   			 V
 		   							      reagent_list var (list)   	A List of datums, each datum is a reagent.
 
 		   							      |          |          |
@@ -179,9 +179,6 @@ About Reagents:
 		scannable
 			If set to 1, will show up on health analyzers by name.
 
-		affects_dead
-			If set to 1, will affect dead players. Used by Adminordrazine.
-
 		glass_icon_state
 			Used by drinks. icon_state of the glass when this reagent is the master reagent.
 
@@ -295,7 +292,7 @@ About the Tools:
 			'pouring' our reagents into something else.
 
 		atom/proc/is_open_container()
-			Checks atom/var/flags & OPENCONTAINER.
+			Checks atom/var/obj_flags & OBJ_FLAG_OPEN_CONTAINER.
 			If this returns 1 , you can use syringes, beakers etc
 			to manipulate the contents of this object.
 			If it's 0, you'll need to write your own custom reagent

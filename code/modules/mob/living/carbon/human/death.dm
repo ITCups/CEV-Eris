@@ -1,9 +1,8 @@
 /mob/living/carbon/human/gib()
-
 	for(var/obj/item/organ/I in internal_organs)
 		I.removed()
 		if(istype(loc,/turf))
-			I.throw_at(get_edge_target_turf(src,pick(alldirs)),rand(1,3),30)
+			I.throw_at(get_edge_target_turf(src,pick(GLOB.alldirs)),rand(1,3),30)
 
 	for(var/obj/item/organ/external/E in src.organs)
 		E.droplimb(0,DROPLIMB_EDGE,1)
@@ -12,10 +11,10 @@
 
 	for(var/obj/item/I in src)
 		drop_from_inventory(I)
-		I.throw_at(get_edge_target_turf(src,pick(alldirs)), rand(1,3), round(30/I.w_class))
+		I.throw_at(get_edge_target_turf(src,pick(GLOB.alldirs)), rand(1,3), round(30/I.w_class))
 
 	..(species.gibbed_anim)
-	gibs(loc, dna, null, species.flesh_color, species.blood_color)
+	gibs(loc, dna, null, species.get_flesh_colour(src), species.get_blood_colour(src))
 
 /mob/living/carbon/human/dust()
 	if(species)
@@ -23,15 +22,23 @@
 	else
 		..()
 
-/mob/living/carbon/human/death(gibbed)
+/mob/living/carbon/human/death(gibbed,deathmessage="seizes up and falls limp...", show_dead_message = "You have died.")
+
 	if(stat == DEAD) return
 
 	BITSET(hud_updateflag, HEALTH_HUD)
 	BITSET(hud_updateflag, STATUS_HUD)
 	BITSET(hud_updateflag, LIFE_HUD)
 
+	//backs up lace if available.
+	var/obj/item/organ/internal/stack/s = get_organ(BP_STACK)
+	if(s)
+		s.do_backup()
+
 	//Handle species-specific deaths.
 	species.handle_death(src)
+
+	animate_tail_stop()
 
 	//Handle brain slugs.
 	var/obj/item/organ/external/head = get_organ(BP_HEAD)
@@ -48,39 +55,39 @@
 			if(B.host_brain.ckey)
 				ckey = B.host_brain.ckey
 				B.host_brain.ckey = null
-				B.host_brain.name = "host brain"
+				B.host_brain.SetName("host brain")
 				B.host_brain.real_name = "host brain"
+
 			verbs -= /mob/living/carbon/proc/release_control
 
 	callHook("death", list(src, gibbed))
 
-	if(wearing_rig)
-		wearing_rig.notify_ai(
-			SPAN_DANGER("Warning: user death event. Mobility control passed to integrated intelligence system.")
-		)
+	if(ticker && ticker.mode)
+		sql_report_death(src)
+		ticker.mode.check_win()
 
-	. = ..(gibbed,species.death_message)
+	if(wearing_rig)
+		wearing_rig.notify_ai("<span class='danger'>Warning: user death event. Mobility control passed to integrated intelligence system.</span>")
+
+	. = ..(gibbed,"no message")
 	if(!gibbed)
-		dizziness = 0
-		jitteriness = 0
 		handle_organs()
-		dead_HUD()
 		if(species.death_sound)
 			playsound(loc, species.death_sound, 80, 1, 1)
 	handle_hud_list()
-
 
 /mob/living/carbon/human/proc/ChangeToHusk()
 	if(HUSK in mutations)	return
 
 	if(f_style)
-		f_style = "Shaved"	//we only change the icon_state of the hair datum, so it doesn't mess up their UI/UE
+		f_style = "Shaved"		//we only change the icon_state of the hair datum, so it doesn't mess up their UI/UE
 	if(h_style)
 		h_style = "Bald"
 	update_hair(0)
 
 	mutations.Add(HUSK)
-	status_flags |= DISFIGURED	//makes them unknown without fucking up other stuff like admintools
+	for(var/obj/item/organ/external/E in organs)
+		E.status |= ORGAN_DISFIGURED
 	update_body(1)
 	return
 
@@ -99,6 +106,7 @@
 	update_hair(0)
 
 	mutations.Add(SKELETON)
-	status_flags |= DISFIGURED
-	update_body(0)
+	for(var/obj/item/organ/external/E in organs)
+		E.status |= ORGAN_DISFIGURED
+	update_body(1)
 	return

@@ -3,10 +3,14 @@
 	real_name = "cortical borer"
 	desc = "A small, quivering sluglike creature."
 	speak_emote = list("chirrups")
+	emote_hear = list("chirrups")
 	response_help  = "pokes"
 	response_disarm = "prods"
 	response_harm   = "stomps on"
 	icon_state = "brainslug"
+	item_state = "voxslug" // For the lack of a better sprite...
+	icon_living = "brainslug"
+	icon_dead = "brainslug_dead"
 	speed = 5
 	a_intent = I_HURT
 	stop_automated_movement = 1
@@ -14,9 +18,19 @@
 	attacktext = "nipped"
 	friendly = "prods"
 	wander = 0
-	pass_flags = PASSTABLE
+	pass_flags = PASS_FLAG_TABLE
 	universal_understand = 1
-	//holder_type = /obj/item/weapon/holder/borer //Theres no inhand sprites for holding borers, it turns you into a pink square
+	holder_type = /obj/item/weapon/holder/borer
+	mob_size = MOB_SMALL
+	can_escape = 1
+
+	bleed_colour = "#816e12"
+
+	var/generation = 1
+	var/static/list/borer_names = list(
+		"Primary", "Secondary", "Tertiary", "Quaternary", "Quinary", "Senary",
+		"Septenary", "Octonary", "Novenary", "Decenary", "Undenary", "Duodenary",
+		)
 
 	var/used_dominate
 	var/chemicals = 10                      // Chemicals used for reproduction and spitting neurotoxin.
@@ -33,19 +47,18 @@
 
 /mob/living/simple_animal/borer/Login()
 	..()
-	if(!roundstart && mind && !mind.antagonist.len)
-		var/a_type = antag_types[ROLE_BORER_REPRODUCED]
-		var/datum/antagonist/A = new a_type
-		A.create_antagonist(mind,update = FALSE)
+	if(mind)
+		GLOB.borers.add_antagonist(mind)
 
-/mob/living/simple_animal/borer/New()
-	..()
+/mob/living/simple_animal/borer/New(atom/newloc, var/gen=1)
+	..(newloc)
 
-	add_language(LANGUAGE_CORTICAL)
+	add_language("Cortical Link")
 	verbs += /mob/living/proc/ventcrawl
 	verbs += /mob/living/proc/hide
 
-	truename = "[pick("Primary","Secondary","Tertiary","Quaternary")] [rand(1000,9999)]"
+	generation = gen
+	truename = "[borer_names[min(generation, borer_names.len)]] [random_id("borer[generation]", 1000, 9999)]"
 	if(!roundstart) request_player()
 
 /mob/living/simple_animal/borer/Life()
@@ -56,19 +69,19 @@
 
 		if(!stat && !host.stat)
 
-			if(host.reagents.has_reagent("sugar"))
+			if(host.reagents.has_reagent(/datum/reagent/sugar))
 				if(!docile)
 					if(controlling)
-						host << "\blue You feel the soporific flow of sugar in your host's blood, lulling you into docility."
+						to_chat(host, "<span class='notice'>You feel the soporific flow of sugar in your host's blood, lulling you into docility.</span>")
 					else
-						src << "\blue You feel the soporific flow of sugar in your host's blood, lulling you into docility."
+						to_chat(src, "<span class='notice'>You feel the soporific flow of sugar in your host's blood, lulling you into docility.</span>")
 					docile = 1
 			else
 				if(docile)
 					if(controlling)
-						host << "\blue You shake off your lethargy as the sugar leaves your host's blood."
+						to_chat(host, "<span class='notice'>You shake off your lethargy as the sugar leaves your host's blood.</span>")
 					else
-						src << "\blue You shake off your lethargy as the sugar leaves your host's blood."
+						to_chat(src, "<span class='notice'>You shake off your lethargy as the sugar leaves your host's blood.</span>")
 					docile = 0
 
 			if(chemicals < 250)
@@ -76,18 +89,18 @@
 			if(controlling)
 
 				if(docile)
-					host << "\blue You are feeling far too docile to continue controlling your host..."
+					to_chat(host, "<span class='notice'>You are feeling far too docile to continue controlling your host...</span>")
 					host.release_control()
 					return
 
 				if(prob(5))
 					host.adjustBrainLoss(0.1)
 
-				if(prob(host.brainloss/20))
-					host.say("*[pick(list("blink","blink_r","choke","aflap","drool","twitch","twitch_s","gasp"))]")
+				if(prob(host.getBrainLoss()/20))
+					host.say("*[pick(list("blink","blink_r","choke","aflap","drool","twitch","twitch_v","gasp"))]")
 
 /mob/living/simple_animal/borer/Stat()
-	..()
+	. = ..()
 	statpanel("Status")
 
 	if(evacuation_controller)
@@ -102,14 +115,14 @@
 
 	if(!host || !controlling) return
 
-	if(ishuman(host))
+	if(istype(host,/mob/living/carbon/human))
 		var/mob/living/carbon/human/H = host
 		var/obj/item/organ/external/head = H.get_organ(BP_HEAD)
 		head.implants -= src
 
 	controlling = 0
 
-	host.remove_language(LANGUAGE_CORTICAL)
+	host.remove_language("Cortical Link")
 	host.verbs -= /mob/living/carbon/proc/release_control
 	host.verbs -= /mob/living/carbon/proc/punish_host
 	host.verbs -= /mob/living/carbon/proc/spawn_larvae
@@ -154,7 +167,7 @@
 	if(!host) return
 
 	if(host.mind)
-		clear_antagonist_type(host.mind, ROLE_BORER)
+		GLOB.borers.remove_antagonist(host.mind)
 
 	src.loc = get_turf(host)
 
@@ -173,6 +186,3 @@
 /mob/living/simple_animal/borer/proc/request_player()
 	var/datum/ghosttrap/G = get_ghost_trap("cortical borer")
 	G.request_player(src, "A cortical borer needs a player.")
-
-/mob/living/simple_animal/borer/cannot_use_vents()
-	return

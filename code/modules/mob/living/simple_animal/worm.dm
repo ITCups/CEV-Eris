@@ -3,10 +3,12 @@
 	desc = "A part of a space worm."
 	icon = 'icons/mob/animal.dmi'
 	icon_state = "spaceworm"
+	icon_living = "spaceworm"
+	icon_dead = "spacewormdead"
 	status_flags = 0
 
 	speak_emote = list("transmits") //not supposed to be used under AI control
-	emote_see = list("transmits")  //I'm just adding it so it doesn't runtime if controlled by player who speaks
+	emote_hear = list("transmits")  //I'm just adding it so it doesn't runtime if controlled by player who speaks
 
 	response_help  = "touches"
 	response_disarm = "flails at"
@@ -24,9 +26,8 @@
 
 	minbodytemp = 0
 	maxbodytemp = 350
-	min_oxy = 0
-	max_co2 = 0
-	max_tox = 0
+	min_gas = null
+	max_gas = null
 
 	a_intent = I_HURT //so they don't get pushed around
 
@@ -47,7 +48,8 @@
 	head
 		name = "space worm head"
 		icon_state = "spacewormhead"
-		icon_dead = "spaceworm_dead"
+		icon_living = "spacewormhead"
+		icon_dead = "spacewormdead"
 
 		maxHealth = 20
 		health = 20
@@ -120,7 +122,7 @@
 
 		return
 
-	proc/update_icon() //only for the sake of consistency with the other update icon procs
+	update_icon() //only for the sake of consistency with the other update icon procs
 		if(stat == CONSCIOUS || stat == UNCONSCIOUS)
 			if(previous) //midsection
 				icon_state = "spaceworm[get_dir(src,previous) | get_dir(src,next)]" //see 3 lines below
@@ -157,33 +159,28 @@
 
 	proc/Detach(die = 0)
 		var/mob/living/simple_animal/space_worm/newHead = new /mob/living/simple_animal/space_worm/head(loc,0)
-		var/mob/living/simple_animal/space_worm/newHeadPrevious = previous
 
-		previous = null //so that no extra heads are spawned
-
-		newHead.Attach(newHeadPrevious)
+		newHead.Attach(src)
 
 		if(die)
 			newHead.death()
-
-		qdel(src)
 
 	proc/ProcessStomach()
 		for(var/atom/movable/stomachContent in contents)
 			if(prob(digestionProbability))
 				if(istype(stomachContent,/obj/item/stack)) //converts to plasma, keeping the stack value
-					if(!istype(stomachContent,/obj/item/stack/material/plasma))
+					if(!istype(stomachContent,/obj/item/stack/material/phoron))
 						var/obj/item/stack/oldStack = stomachContent
-						new /obj/item/stack/material/plasma(src, oldStack.get_amount())
+						new /obj/item/stack/material/phoron(src, oldStack.get_amount())
 						qdel(oldStack)
 						continue
 				else if(istype(stomachContent,/obj/item)) //converts to plasma, keeping the w_class
 					var/obj/item/oldItem = stomachContent
-					new /obj/item/stack/material/plasma(src, oldItem.w_class)
+					new /obj/item/stack/material/phoron(src, oldItem.w_class)
 					qdel(oldItem)
 					continue
 				else
-					new /obj/item/stack/material/plasma(src, flatPlasmaValue) //just flat amount
+					new /obj/item/stack/material/phoron(src, flatPlasmaValue) //just flat amount
 					qdel(stomachContent)
 					continue
 

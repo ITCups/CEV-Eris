@@ -4,8 +4,11 @@
 	real_name = "corgi"
 	desc = "It's a corgi."
 	icon_state = "corgi"
-	item_state = "corgi"
+	icon_living = "corgi"
+	icon_dead = "corgi_dead"
+	speak = list("YAP", "Woof!", "Bark!", "AUUUUUU")
 	speak_emote = list("barks", "woofs")
+	emote_hear = list("barks", "woofs", "yaps","pants")
 	emote_see = list("shakes its head", "shivers")
 	speak_chance = 1
 	turns_per_move = 10
@@ -20,6 +23,7 @@
 	holder_type = /obj/item/weapon/holder/corgi
 	var/obj/item/inventory_head
 	var/obj/item/inventory_back
+	pass_flags = PASS_FLAG_TABLE
 
 //IAN! SQUEEEEEEEEE~
 /mob/living/simple_animal/corgi/Ian
@@ -77,8 +81,7 @@
 						visible_emote("stares at the [movement_target] that [movement_target.loc] has with sad puppy eyes.")
 
 		if(prob(1))
-			var/msg2 = (pick("dances around","chases their tail"))
-			src.visible_message("<span class='name'>[src]</span> [msg2].")
+			visible_emote(pick("dances around.","chases their tail."))
 			spawn(0)
 				for(var/i in list(1,2,4,8,4,2,1,2,4,8,4,2,1,2,4,8,4,2))
 					set_dir(i)
@@ -93,7 +96,7 @@
 		if(!stat)
 			for(var/mob/M in viewers(user, null))
 				if ((M.client && !( M.blinded )))
-					M.show_message("\blue [user] baps [name] on the nose with the rolled up [O]")
+					M.show_message("<span class='notice'>[user] baps [name] on the nose with the rolled up [O]</span>")
 			spawn(0)
 				for(var/i in list(1,2,4,8,4,2,1,2))
 					set_dir(i)
@@ -129,14 +132,15 @@
 	real_name = "corgi"
 	desc = "It's a corgi puppy."
 	icon_state = "puppy"
+	icon_living = "puppy"
+	icon_dead = "puppy_dead"
 
 //pupplies cannot wear anything.
 /mob/living/simple_animal/corgi/puppy/Topic(href, href_list)
 	if(href_list["remove_inv"] || href_list["add_inv"])
-		usr << "\red You can't fit this on [src]"
+		to_chat(usr, "<span class='warning'>You can't fit this on [src]</span>")
 		return
 	..()
-
 
 //LISA! SQUEEEEEEEEE~
 /mob/living/simple_animal/corgi/Lisa
@@ -145,6 +149,8 @@
 	gender = FEMALE
 	desc = "It's a corgi with a cute pink bow."
 	icon_state = "lisa"
+	icon_living = "lisa"
+	icon_dead = "lisa_dead"
 	response_help  = "pets"
 	response_disarm = "bops"
 	response_harm   = "kicks"
@@ -154,7 +160,7 @@
 //Lisa already has a cute bow!
 /mob/living/simple_animal/corgi/Lisa/Topic(href, href_list)
 	if(href_list["remove_inv"] || href_list["add_inv"])
-		usr << "\red [src] already has a cute bow!"
+		to_chat(usr, "<span class='warning'>[src] already has a cute bow!</span>")
 		return
 	..()
 
@@ -184,8 +190,7 @@
 
 
 		if(prob(1))
-			var/msg3 = (pick("dances around","chases her tail"))
-			src.visible_message("<span class='name'>[src]</span> [msg3].")
+			visible_emote(pick("dances around","chases her tail"))
 			spawn(0)
 				for(var/i in list(1,2,4,8,4,2,1,2,4,8,4,2,1,2,4,8,4,2))
 					set_dir(i)

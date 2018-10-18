@@ -1,40 +1,84 @@
+
 /obj/item/organ/internal/eyes
 	name = "eyeballs"
 	icon_state = "eyes"
 	gender = PLURAL
-	organ_tag = O_EYES
+	organ_tag = BP_EYES
 	parent_organ = BP_HEAD
-	var/eyes_color = "#000000"
-	var/robo_color = "#000000"
-	var/cache_key = O_EYES
+	surface_accessible = TRUE
+	relative_size = 10
+	var/phoron_guard = 0
+	var/list/eye_colour = list(0,0,0)
+	var/innate_flash_protection = FLASH_PROTECTION_NONE
+	max_damage = 45
 
-/obj/item/organ/internal/eyes/proc/get_icon()
-	var/icon/eyes_icon = new/icon('icons/mob/human_face.dmi', "eye_l[owner.body_build.index]")
-	eyes_icon.Blend(icon('icons/mob/human_face.dmi', "eye_r[owner.body_build.index]"), ICON_OVERLAY)
-	eyes_icon.Blend(robotic ? robo_color : eyes_color, ICON_ADD)
-	return eyes_icon
+/obj/item/organ/internal/eyes/optics
+	status = ORGAN_ROBOTIC
+	organ_tag = BP_OPTICS
 
-/obj/item/organ/internal/eyes/proc/get_cache_key()
-	return "[cache_key][robotic ? robo_color : eyes_color]"
+/obj/item/organ/internal/eyes/optics/New()
+	..()
+	robotize()
+
+/obj/item/organ/internal/eyes/robotize()
+	..()
+	name = "optical sensor"
+	icon = 'icons/obj/robot_component.dmi'
+	icon_state = "camera"
+	dead_icon = "camera_broken"
+	verbs |= /obj/item/organ/internal/eyes/proc/change_eye_color
+	update_colour()
+
+/obj/item/organ/internal/eyes/robot
+	name = "optical sensor"
+
+/obj/item/organ/internal/eyes/proc/change_eye_color()
+	set name = "Change Eye Color"
+	set desc = "Changes your robotic eye color."
+	set category = "IC"
+	set src in usr
+	if (owner.incapacitated())
+		return
+	var/new_eyes = input("Please select eye color.", "Eye Color", rgb(owner.r_eyes, owner.g_eyes, owner.b_eyes)) as color|null
+	if(new_eyes)
+		var/r_eyes = hex2num(copytext(new_eyes, 2, 4))
+		var/g_eyes = hex2num(copytext(new_eyes, 4, 6))
+		var/b_eyes = hex2num(copytext(new_eyes, 6, 8))
+		if(do_after(owner, 10) && owner.change_eye_color(r_eyes, g_eyes, b_eyes))
+			update_colour()
+			// Finally, update the eye icon on the mob.
+			owner.regenerate_icons()
+			owner.visible_message(SPAN_NOTICE("\The [owner] changes their eye color."),SPAN_NOTICE("You change your eye color."),)
+
+
+/obj/item/organ/internal/eyes/robot/New()
+	..()
+	robotize()
 
 /obj/item/organ/internal/eyes/replaced(var/mob/living/carbon/human/target)
 
 	// Apply our eye colour to the target.
-	if(istype(target) && eyes_color)
-		target.eyes_color = eyes_color
+	if(istype(target) && eye_colour)
+		target.r_eyes = eye_colour[1]
+		target.g_eyes = eye_colour[2]
+		target.b_eyes = eye_colour[3]
 		target.update_eyes()
 	..()
 
 /obj/item/organ/internal/eyes/proc/update_colour()
 	if(!owner)
 		return
-	eyes_color = owner.eyes_color
+	eye_colour = list(
+		owner.r_eyes ? owner.r_eyes : 0,
+		owner.g_eyes ? owner.g_eyes : 0,
+		owner.b_eyes ? owner.b_eyes : 0
+		)
 
-/obj/item/organ/internal/eyes/take_damage(amount, var/silent=0)
+/obj/item/organ/internal/eyes/take_internal_damage(amount, var/silent=0)
 	var/oldbroken = is_broken()
-	..()
+	. = ..()
 	if(is_broken() && !oldbroken && owner && !owner.stat)
-		owner << SPAN_DANGER("You go blind!")
+		to_chat(owner, "<span class='danger'>You go blind!</span>")
 
 /obj/item/organ/internal/eyes/Process() //Eye damage replaces the old eye_stat var.
 	..()
@@ -45,37 +89,8 @@
 	if(is_broken())
 		owner.eye_blind = 20
 
+/obj/item/organ/internal/eyes/proc/get_total_protection(var/flash_protection = FLASH_PROTECTION_NONE)
+	return (flash_protection + innate_flash_protection)
 
-
-//Subtypes
-/obj/item/organ/internal/eyes/oneeye
-	icon_state = "eye_l"
-	cache_key = "left_eye"
-
-/obj/item/organ/internal/eyes/oneeye/get_icon()
-	var/icon/eyes_icon
-	eyes_icon = icon('icons/mob/human_face.dmi', "[icon_state][owner.body_build.index]")
-	eyes_icon.Blend(robotic ? robo_color : eyes_color, ICON_ADD)
-	return eyes_icon
-
-/obj/item/organ/internal/eyes/oneeye/right
-	icon_state = "eye_r"
-	cache_key = "right_eye"
-
-/obj/item/organ/internal/eyes/heterohromia
-	var/second_color = "#000000"
-	cache_key = "heterohromia"
-
-/obj/item/organ/internal/eyes/heterohromia/get_cache_key()
-	return "[cache_key][robotic ? robo_color : eyes_color]&[second_color]"
-
-/obj/item/organ/internal/eyes/heterohromia/get_icon()
-	var/icon/eyes_icon = icon('icons/mob/human_face.dmi', "eye_l[owner.body_build.index]")
-	eyes_icon.Blend(robotic ? robo_color : eyes_color, ICON_ADD)
-
-	var/icon/right_eye = icon('icons/mob/human_face.dmi', "eye_r[owner.body_build.index]")
-	right_eye.Blend(second_color, ICON_ADD)
-	eyes_icon.Blend(right_eye)
-
-	return eyes_icon
-
+/obj/item/organ/internal/eyes/proc/additional_flash_effects(var/intensity)
+	return -1

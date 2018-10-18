@@ -1,4 +1,3 @@
-ADMIN_VERB_ADD(/client/proc/makePAI, R_ADMIN, FALSE)
 // Originally a debug verb, made it a proper adminverb for ~fun~
 /client/proc/makePAI(turf/t in range(world.view), name as text, pai_key as null|text)
 	set name = "Make pAI"
@@ -8,7 +7,7 @@ ADMIN_VERB_ADD(/client/proc/makePAI, R_ADMIN, FALSE)
 		return
 
 	if(!pai_key)
-		var/client/C = input("Select client") as null|anything in clients
+		var/client/C = input("Select client") as null|anything in GLOB.clients
 		if(!C) return
 		pai_key = C.key
 
@@ -19,4 +18,4 @@ ADMIN_VERB_ADD(/client/proc/makePAI, R_ADMIN, FALSE)
 	card.setPersonality(pai)
 
 	if(name)
-		pai.SetName(name)
+		pai.fully_replace_character_name(name)

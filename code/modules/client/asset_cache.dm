@@ -25,7 +25,7 @@ You can set verify to TRUE if you want send() to sleep until the client has the 
 
 //This proc sends the asset to the client, but only if it needs it.
 //This proc blocks(sleeps) unless verify is set to false
-/proc/send_asset(var/client/client, var/asset_name, var/verify = TRUE)
+/proc/send_asset(var/client/client, var/asset_name, var/verify = TRUE, var/check_cache = TRUE)
 	if(!istype(client))
 		if(ismob(client))
 			var/mob/M = client
@@ -38,7 +38,7 @@ You can set verify to TRUE if you want send() to sleep until the client has the 
 		else
 			return 0
 
-	if(client.cache.Find(asset_name) || client.sending.Find(asset_name))
+	if(check_cache && (client.cache.Find(asset_name) || client.sending.Find(asset_name)))
 		return 0
 
 	client << browse_rsc(asset_cache.cache[asset_name], asset_name)
@@ -89,7 +89,7 @@ You can set verify to TRUE if you want send() to sleep until the client has the 
 	if(!unreceived || !unreceived.len)
 		return 0
 	if (unreceived.len >= ASSET_CACHE_TELL_CLIENT_AMOUNT)
-		client << "Sending Resources..."
+		to_chat(client, "Sending Resources...")
 	for(var/asset in unreceived)
 		if (asset in asset_cache.cache)
 			client << browse_rsc(asset_cache.cache[asset], asset)
@@ -178,36 +178,6 @@ You can set verify to TRUE if you want send() to sleep until the client has the 
 		"tgui.js"	= 'tgui/assets/tgui.js'
 	)
 
-
-/datum/asset/simple/pda
-	assets = list(
-		"pda_atmos.png"			= 'icons/pda_icons/pda_atmos.png',
-		"pda_back.png"			= 'icons/pda_icons/pda_back.png',
-		"pda_bell.png"			= 'icons/pda_icons/pda_bell.png',
-		"pda_blank.png"			= 'icons/pda_icons/pda_blank.png',
-		"pda_boom.png"			= 'icons/pda_icons/pda_boom.png',
-		"pda_bucket.png"		= 'icons/pda_icons/pda_bucket.png',
-		"pda_chatroom.png"      = 'icons/pda_icons/pda_chatroom.png',
-		"pda_crate.png"         = 'icons/pda_icons/pda_crate.png',
-		"pda_cuffs.png"         = 'icons/pda_icons/pda_cuffs.png',
-		"pda_eject.png"			= 'icons/pda_icons/pda_eject.png',
-		"pda_exit.png"			= 'icons/pda_icons/pda_exit.png',
-		"pda_honk.png"			= 'icons/pda_icons/pda_honk.png',
-		"pda_locked.png"        = 'icons/pda_icons/pda_locked.png',
-		"pda_mail.png"			= 'icons/pda_icons/pda_mail.png',
-		"pda_medical.png"		= 'icons/pda_icons/pda_medical.png',
-		"pda_menu.png"			= 'icons/pda_icons/pda_menu.png',
-		"pda_mule.png"			= 'icons/pda_icons/pda_mule.png',
-		"pda_notes.png"			= 'icons/pda_icons/pda_notes.png',
-		"pda_power.png"			= 'icons/pda_icons/pda_power.png',
-		"pda_rdoor.png"			= 'icons/pda_icons/pda_rdoor.png',
-		"pda_reagent.png"		= 'icons/pda_icons/pda_reagent.png',
-		"pda_refresh.png"		= 'icons/pda_icons/pda_refresh.png',
-		"pda_scanner.png"		= 'icons/pda_icons/pda_scanner.png',
-		"pda_signaler.png"		= 'icons/pda_icons/pda_signaler.png',
-		"pda_status.png"		= 'icons/pda_icons/pda_status.png'
-	)
-
 /datum/asset/nanoui
 	var/list/common = list()
 
@@ -240,7 +210,7 @@ You can set verify to TRUE if you want send() to sleep until the client has the 
 					register_asset(filename, fcopy_rsc(path + filename))
 
 	var/list/mapnames = list()
-	for(var/z in maps_data.station_levels)
+	for(var/z in GLOB.using_map.map_levels)
 		mapnames += map_image_file_name(z)
 
 	var/list/filenames = flist(MAP_IMAGE_PATH)
@@ -270,12 +240,12 @@ var/decl/asset_cache/asset_cache = new()
 	..()
 	cache = new
 
-/proc/send_assets()
+/hook/roundstart/proc/send_assets()
 	for(var/type in typesof(/datum/asset) - list(/datum/asset, /datum/asset/simple))
 		var/datum/asset/A = new type()
 		A.register()
 
-	for(var/client/C in clients)
+	for(var/client/C in GLOB.clients)
 		// Doing this to a client too soon after they've connected can cause issues, also the proc we call sleeps.
 		spawn(10)
 			getFilesSlow(C, asset_cache.cache, FALSE)

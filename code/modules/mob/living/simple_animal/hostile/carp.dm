@@ -4,10 +4,12 @@
 	name = "space carp"
 	desc = "A ferocious, fang-bearing creature that resembles a fish."
 	icon_state = "carp"
+	icon_living = "carp"
+	icon_dead = "carp_dead"
 	icon_gib = "carp_gib"
 	speak_chance = 0
 	turns_per_move = 5
-	meat_type = /obj/item/weapon/reagent_containers/food/snacks/carpmeat
+	meat_type = /obj/item/weapon/reagent_containers/food/snacks/fish/poison
 	response_help = "pets the"
 	response_disarm = "gently pushes aside the"
 	response_harm = "hits the"
@@ -22,27 +24,25 @@
 	attack_sound = 'sound/weapons/bite.ogg'
 
 	//Space carp aren't affected by atmos.
-	min_oxy = 0
-	max_oxy = 0
-	min_tox = 0
-	max_tox = 0
-	min_co2 = 0
-	max_co2 = 0
-	min_n2 = 0
-	max_n2 = 0
+	min_gas = null
+	max_gas = null
 	minbodytemp = 0
 
 	break_stuff_probability = 15
 
 	faction = "carp"
 
-/mob/living/simple_animal/hostile/carp/Process_Spacemove(var/check_drift = 0)
+	bleed_colour = "#5d0d71"
+
+	pass_flags = PASS_FLAG_TABLE
+
+/mob/living/simple_animal/hostile/carp/Allow_Spacemove(var/check_drift = 0)
 	return 1	//No drifting in space for space carp!	//original comments do not steal
 
 /mob/living/simple_animal/hostile/carp/FindTarget()
 	. = ..()
 	if(.)
-		visible_emote("nashes at [.].")
+		custom_emote(1,"nashes at [.]")
 
 /mob/living/simple_animal/hostile/carp/AttackingTarget()
 	. =..()
@@ -50,4 +50,4 @@
 	if(istype(L))
 		if(prob(15))
 			L.Weaken(3)
-			L.visible_message(SPAN_DANGER("\the [src] knocks down \the [L]!"))
+			L.visible_message("<span class='danger'>\the [src] knocks down \the [L]!</span>")

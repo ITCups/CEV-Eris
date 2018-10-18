@@ -1,8 +1,10 @@
 /mob/living/simple_animal/hostile/scarybat
 	name = "space bats"
-	desc = "A swarm of cute little blood sucking bats that looks pretty upset."
+	desc = "A swarm of cute little blood sucking bats - they look pretty upset."
 	icon = 'icons/mob/bats.dmi'
 	icon_state = "bat"
+	icon_living = "bat"
+	icon_dead = "bat_dead"
 	icon_gib = "bat_dead"
 	speak_chance = 0
 	turns_per_move = 3
@@ -20,15 +22,8 @@
 	attacktext = "bites"
 	attack_sound = 'sound/weapons/bite.ogg'
 
-	//Space carp aren't affected by atmos.
-	min_oxy = 0
-	max_oxy = 0
-	min_tox = 0
-	max_tox = 0
-	min_co2 = 0
-	max_co2 = 0
-	min_n2 = 0
-	max_n2 = 0
+	min_gas = null
+	max_gas = null
 	minbodytemp = 0
 
 	environment_smash = 1
@@ -40,9 +35,6 @@
 	..()
 	if(istype(L))
 		owner = L
-
-/mob/living/simple_animal/hostile/scarybat/Process_Spacemove(var/check_drift = 0)
-	return ..()	//No drifting in space for space carp!	//original comments do not steal
 
 /mob/living/simple_animal/hostile/scarybat/FindTarget()
 	. = ..()
@@ -60,8 +52,11 @@
 	if(istype(L))
 		if(prob(15))
 			L.Stun(1)
-			L.visible_message(SPAN_DANGER("\the [src] scares \the [L]!"))
+			L.visible_message("<span class='danger'>\the [src] scares \the [L]!</span>")
 
 /mob/living/simple_animal/hostile/scarybat/cult
 	faction = "cult"
 	supernatural = 1
+
+/mob/living/simple_animal/hostile/scarybat/cult/cultify()
+	return
