@@ -90,11 +90,12 @@ SUBSYSTEM_DEF(atoms)
 				qdeleted = TRUE
 			else
 				BadInitializeCalls[the_type] |= BAD_INIT_NO_HINT
-
 	if(!A)	//possible harddel
 		qdeleted = TRUE
-	else if(!A.initialized)
+	else if(!A.initialized && !qdeleted)
 		BadInitializeCalls[the_type] |= BAD_INIT_DIDNT_INIT
+	if(A)
+		SScatalog_setup.register_atom(A)
 
 	return qdeleted || QDELING(A)
 
